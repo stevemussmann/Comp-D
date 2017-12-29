@@ -235,13 +235,13 @@ int main(int argc, char** argv) {
 			fourtax dtest(keep.size(), ntaxa);
 			if(hetIgnore==true || (hetIgnore==false && hetInclude==false))
 			{
-				dtest.populateDtest(keep, current, indlist, generator, my_rank, ntaxa);
-				test->calcDs(dtest, keep.size(), ntaxa, current, my_rank);
+				dtest.populateDtest(keep, current, indlist, generator, ntaxa);
+				test->calcDs(dtest, keep.size(), ntaxa, current);
 				test->calcStats(keep.size());
 			}
 			else if(hetInclude==true)
 			{
-				dtest.populateDtest(keep, current, indlist, my_rank, ntaxa);
+				dtest.populateDtest(keep, current, indlist, ntaxa);
 				test->calcPolyDs(dtest, keep.size());
 				test->polyCalcStats(keep.size());
 			}
@@ -254,7 +254,7 @@ int main(int argc, char** argv) {
 		//calculate proportion of discordant loci
 		MPI_Barrier(MPI_COMM_WORLD);
 		
-		test->bootstrap(mpiboot, bootstrap, indlist, generator, ntaxa, current, keep, my_rank, i, comb.size(), indarray, output, hetIgnore, hetInclude);
+		test->bootstrap(bootstrap, indlist, generator, ntaxa, current, keep, i, comb.size(), indarray, output, hetIgnore, hetInclude);
 		
 		if(my_rank == 0){
 			//put D stats into arrays

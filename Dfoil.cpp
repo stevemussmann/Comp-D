@@ -16,8 +16,6 @@
 #include <fstream>
 #include <iostream>
 
-#include "mpi.h"
-
 #include <boost/math/distributions/chi_squared.hpp>
 #include <boost/math/distributions/normal.hpp>
 
@@ -197,11 +195,11 @@ void Dfoil::polyCalcDOL()
 	}
 }
 
-void Dfoil::calcDs(fourtax &dtest, unsigned int length, int ntaxa, locusfile &file, int my_rank)
+void Dfoil::calcDs(fourtax &dtest, unsigned int length, int ntaxa, locusfile &file)
 {
 	for(unsigned int i=0; i<length; i++)
 	{
-		dtest.calculatePattern(i, ntaxa, file, my_rank);
+		dtest.calculatePattern(i, ntaxa, file);
 		patterns[dtest.getPattern(i)]++;
 	}
 }
@@ -372,7 +370,7 @@ void Dfoil::calcStats()
 	calcDOL();
 }
 
-void Dfoil::bootstrap(int mpiboot, int bootstrap, std::unordered_map <std::string,int> &indlist, std::default_random_engine &generator, int ntaxa, locusfile &current, std::vector<int> &keep, int my_rank, int i, int combs, std::string *indarray, std::string output, bool hetIgnore, bool hetInclude)
+void Dfoil::bootstrap(int bootstrap, std::unordered_map <std::string,int> &indlist, std::default_random_engine &generator, int ntaxa, locusfile &current, std::vector<int> &keep, int i, int combs, std::string *indarray, std::string output, bool hetIgnore, bool hetInclude)
 {
 	double *allBootDFO;
 	double *allBootDIL;
@@ -384,102 +382,78 @@ void Dfoil::bootstrap(int mpiboot, int bootstrap, std::unordered_map <std::strin
 	allBootDOL = new double[bootstrap];
       
 	//do bootstrapping
-	double *bootDFO;
-	double *bootDIL;
-	double *bootDFI;
-	double *bootDOL;
-	bootDFO = new double[bootstrap];
-	bootDIL = new double[bootstrap];
-	bootDFI = new double[bootstrap];
-	bootDOL = new double[bootstrap];
+	bootproc(bootstrap, keep, allBootDFO, allBootDIL, allBootDFI, allBootDOL, current, indlist, generator, ntaxa, hetIgnore, hetInclude); //call private bootstrap procedure within this class
 
-	bootproc(mpiboot, keep, bootDFO, bootDIL, bootDFI, bootDOL, current, indlist, generator, ntaxa, hetIgnore, hetInclude, my_rank); //call private bootstrap procedure within this class
+	std::cout << "statistics calculated for test " << i+1 << " of " << combs << std::endl;
+	//calculate avg from bootstrapping
+	avgDFO = this->average(allBootDFO, bootstrap);
+	avgDIL = this->average(allBootDIL, bootstrap);
+	avgDFI = this->average(allBootDFI, bootstrap);
+	avgDOL = this->average(allBootDOL, bootstrap);
 
-	MPI_Barrier(MPI_COMM_WORLD); //barrier after bootstrapping
-	
-	MPI_Gather(bootDFO, mpiboot, MPI_DOUBLE, allBootDFO, mpiboot, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-	MPI_Gather(bootDIL, mpiboot, MPI_DOUBLE, allBootDIL, mpiboot, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-	MPI_Gather(bootDFI, mpiboot, MPI_DOUBLE, allBootDFI, mpiboot, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-	MPI_Gather(bootDOL, mpiboot, MPI_DOUBLE, allBootDOL, mpiboot, MPI_DOUBLE, 0, MPI_COMM_WORLD); 
-		
-	if(my_rank == 0)
+	//calculate standard deviation
+	sdDFO = this->stdev(allBootDFO, avgDFO, bootstrap);
+	sdDIL = this->stdev(allBootDIL, avgDIL, bootstrap);
+	sdDFI = this->stdev(allBootDFI, avgDFI, bootstrap);
+	sdDOL = this->stdev(allBootDOL, avgDOL, bootstrap);
+
+	//calculate Z scores
+	ZDFO = this->calcZ(DFO, sdDFO);
+	ZDIL = this->calcZ(DIL, sdDIL);
+	ZDFI = this->calcZ(DFI, sdDFI);
+	ZDOL = this->calcZ(DOL, sdDOL);
+
+	//calculate p-values for Z scores
+	boost::math::normal_distribution<> zdist(0.0, 1.0);
+	ZDFOpval = 2.0*(1-boost::math::cdf(zdist, abs(ZDFO)));
+	ZDILpval = 2.0*(1-boost::math::cdf(zdist, abs(ZDIL)));
+	ZDFIpval = 2.0*(1-boost::math::cdf(zdist, abs(ZDFI)));
+	ZDOLpval = 2.0*(1-boost::math::cdf(zdist, abs(ZDOL)));
+
+	//calculate chi squared values
+	if(hetIgnore==true || (hetIgnore==false && hetInclude==false))
 	{
-		std::cout << "statistics calculated for test " << i+1 << " of " << combs << std::endl;
-		//calculate avg from bootstrapping
-		avgDFO = this->average(allBootDFO, bootstrap);
-		avgDIL = this->average(allBootDIL, bootstrap);
-		avgDFI = this->average(allBootDFI, bootstrap);
-		avgDOL = this->average(allBootDOL, bootstrap);
-
-		//calculate standard deviation
-		sdDFO = this->stdev(allBootDFO, avgDFO, bootstrap);
-		sdDIL = this->stdev(allBootDIL, avgDIL, bootstrap);
-		sdDFI = this->stdev(allBootDFI, avgDFI, bootstrap);
-		sdDOL = this->stdev(allBootDOL, avgDOL, bootstrap);
-
-		//calculate Z scores
-		ZDFO = this->calcZ(DFO, sdDFO);
-		ZDIL = this->calcZ(DIL, sdDIL);
-		ZDFI = this->calcZ(DFI, sdDFI);
-		ZDOL = this->calcZ(DOL, sdDOL);
-
-		//calculate p-values for Z scores
-		boost::math::normal_distribution<> zdist(0.0, 1.0);
-		ZDFOpval = 2.0*(1-boost::math::cdf(zdist, abs(ZDFO)));
-		ZDILpval = 2.0*(1-boost::math::cdf(zdist, abs(ZDIL)));
-		ZDFIpval = 2.0*(1-boost::math::cdf(zdist, abs(ZDFI)));
-		ZDOLpval = 2.0*(1-boost::math::cdf(zdist, abs(ZDOL)));
-
-		//calculate chi squared values
-		if(hetIgnore==true || (hetIgnore==false && hetInclude==false))
-		{
-			calcChiSqr();
-		}
-		else if(hetInclude==true)
-		{
-			polyCalcChiSqr();
-		}
-		else
-		{
-			std::cerr << "This code should not be reachable." << std::endl;
-			exit(EXIT_FAILURE);
-		}
-
-
-		//calculate chi squared p-values
-
-		int df = 1;
-		boost::math::chi_squared Xdist(df);
-
-		XpvalDFO = 1 - boost::math::cdf(Xdist, xsqrDFO);
-		XpvalDIL = 1 - boost::math::cdf(Xdist, xsqrDIL);
-		XpvalDFI = 1 - boost::math::cdf(Xdist, xsqrDFI);
-		XpvalDOL = 1 - boost::math::cdf(Xdist, xsqrDOL);
-			
-		std::cout << "Chi-squared test calculated" << std::endl;
-			
-		//print out statistics
-		writeout(indarray, output, i, hetIgnore, hetInclude );
-		std::cout << "D statistics written" << std::endl;
-		for(int i=0; i<5; i++)
-		{
-			std::cout << indarray[i] << std::endl;
-		}
-		std::cout << std::endl;
+		calcChiSqr();
 	}
+	else if(hetInclude==true)
+	{
+		polyCalcChiSqr();
+	}
+	else
+	{
+		std::cerr << "This code should not be reachable." << std::endl;
+		exit(EXIT_FAILURE);
+	}
+
+	//calculate chi squared p-values
+
+	int df = 1;
+	boost::math::chi_squared Xdist(df);
+
+	XpvalDFO = 1 - boost::math::cdf(Xdist, xsqrDFO);
+	XpvalDIL = 1 - boost::math::cdf(Xdist, xsqrDIL);
+	XpvalDFI = 1 - boost::math::cdf(Xdist, xsqrDFI);
+	XpvalDOL = 1 - boost::math::cdf(Xdist, xsqrDOL);
+			
+	std::cout << "Chi-squared test calculated" << std::endl;
+			
+	//print out statistics
+	writeout(indarray, output, i, hetIgnore, hetInclude );
+	std::cout << "D statistics written" << std::endl;
+	for(int i=0; i<5; i++)
+	{
+		std::cout << indarray[i] << std::endl;
+	}
+	std::cout << std::endl;
 	
 	delete[] indarray;
 	delete[] allBootDFO;
 	delete[] allBootDIL;
 	delete[] allBootDFI;
 	delete[] allBootDOL;
-	delete[] bootDFO;
-	delete[] bootDIL;
-	delete[] bootDFI;
-	delete[] bootDOL;     
 }
 
-void Dfoil::bootproc(int bootstrap, std::vector<int> &keep, double *bootDFO, double *bootDIL, double *bootDFI, double *bootDOL, locusfile &file, std::unordered_map <std::string,int> &indlist, std::default_random_engine &generator, int ntaxa, bool hetIgnore, bool hetInclude, int my_rank)
+void Dfoil::bootproc(int bootstrap, std::vector<int> &keep, double *bootDFO, double *bootDIL, double *bootDFI, double *bootDOL, locusfile &file, std::unordered_map <std::string,int> &indlist, std::default_random_engine &generator, int ntaxa, bool hetIgnore, bool hetInclude)
 {
 	std::uniform_int_distribution<int> uniform(0, keep.size()-1);
 	
@@ -501,13 +475,13 @@ void Dfoil::bootproc(int bootstrap, std::vector<int> &keep, double *bootDFO, dou
 		
 		if(hetIgnore==true || (hetIgnore==false && hetInclude==false))
 		{
-			bootrep.populateDtest(bootloci, file, indlist, generator, my_rank, ntaxa);
-			bootDfoiltest.calcDs(bootrep, keep.size(), ntaxa, file, my_rank);
+			bootrep.populateDtest(bootloci, file, indlist, generator, ntaxa);
+			bootDfoiltest.calcDs(bootrep, keep.size(), ntaxa, file);
 			bootDfoiltest.calcStats();
 		}
 		else if(hetInclude==true)
 		{
-			bootrep.populateDtest(bootloci, file, indlist, my_rank, ntaxa);
+			bootrep.populateDtest(bootloci, file, indlist, ntaxa);
 			bootDfoiltest.calcPolyDs(bootrep, keep.size());
 			bootDfoiltest.polyCalcStats();
 		}
