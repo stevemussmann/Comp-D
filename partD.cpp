@@ -16,8 +16,6 @@
 #include <fstream>
 #include <iostream>
 
-#include "mpi.h"
-
 #include <boost/math/distributions/chi_squared.hpp>
 #include <boost/math/distributions/normal.hpp>
 
@@ -156,11 +154,11 @@ void partD::polyCalcD2()
     }
 }
 
-void partD::calcDs(fourtax &dtest, unsigned int length, int ntaxa, locusfile &file, int my_rank)
+void partD::calcDs(fourtax &dtest, unsigned int length, int ntaxa, locusfile &file)
 {
     for(unsigned int i=0; i<length; i++)
     {
-        dtest.calculatePattern(i, ntaxa, file, my_rank);
+        dtest.calculatePattern(i, ntaxa, file);
         patterns[dtest.getPattern(i)]++;
     }
 }
@@ -292,46 +290,21 @@ void partD::calcStats()
     calcD12();
 }
 
-void partD::bootstrap(int mpiboot, int bootstrap, std::unordered_map <std::string,int> &indlist, 
+void partD::bootstrap(int bootstrap, std::unordered_map <std::string,int> &indlist, 
 		      std::default_random_engine &generator, int ntaxa, locusfile &current, 
-		      std::vector<int> &keep, int my_rank, int i, int combs, std::string *indarray, 
+		      std::vector<int> &keep, int i, int combs, std::string *indarray, 
 		      std::string output, bool hetIgnore, bool hetInclude)
 {
-    double *allBootD1;
+	double *allBootD1;
+	double *allBootD2;
+	double *allBootD12;
 
-    double *allBootD2;
-
-    double *allBootD12;
-
-    allBootD1 = new double[bootstrap];
-
-    allBootD2 = new double[bootstrap];
-
-    allBootD12 = new double[bootstrap];
+	allBootD1 = new double[bootstrap];
+	allBootD2 = new double[bootstrap];
+	allBootD12 = new double[bootstrap];
   
-    //do bootstrapping
-    double *bootD1;
+	bootproc(bootstrap, keep, allBootD1, allBootD2, allBootD12, current, indlist, generator, ntaxa, hetIgnore, hetInclude); //call private bootstrap procedure within this class
 
-    double *bootD2;
-
-    double *bootD12;
-
-    bootD1 = new double[mpiboot];
-
-    bootD2 = new double[mpiboot];
-
-    bootD12 = new double[mpiboot];
-
-    bootproc(mpiboot, keep, bootD1, bootD2, bootD12, current, indlist, generator, ntaxa, hetIgnore, hetInclude, my_rank); //call private bootstrap procedure within this class
-
-    MPI_Barrier(MPI_COMM_WORLD); //barrier after bootstrapping
-    
-    MPI_Gather(bootD1, mpiboot, MPI_DOUBLE, allBootD1, mpiboot, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-    MPI_Gather(bootD2, mpiboot, MPI_DOUBLE, allBootD2, mpiboot, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-    MPI_Gather(bootD12, mpiboot, MPI_DOUBLE, allBootD12, mpiboot, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-            
-    if(my_rank == 0)
-    {
 	std::cout << "statistics calculated for test " << i+1 << " of " << combs << std::endl;
 	//calculate avg from bootstrapping
         avgD1 = this->average(allBootD1, bootstrap);
@@ -393,23 +366,17 @@ void partD::bootstrap(int mpiboot, int bootstrap, std::unordered_map <std::strin
 	    std::cout << indarray[i] << std::endl;
         }
         std::cout << std::endl;
-    }
-    delete[] indarray;
+    
+	delete[] indarray;
 
-    delete[] bootD1;
+	delete[] allBootD1;
 
-    delete[] bootD2;
+	delete[] allBootD2;
 
-    delete[] bootD12;
-
-    delete[] allBootD1;
-
-    delete[] allBootD2;
-
-    delete[] allBootD12;
+	delete[] allBootD12;
 }
 
-void partD::bootproc(int bootstrap, std::vector<int> &keep, double *bootD1, double *bootD2, double *bootD12, locusfile &file, std::unordered_map <std::string,int> &indlist, std::default_random_engine &generator, int ntaxa, bool hetIgnore, bool hetInclude, int my_rank)
+void partD::bootproc(int bootstrap, std::vector<int> &keep, double *bootD1, double *bootD2, double *bootD12, locusfile &file, std::unordered_map <std::string,int> &indlist, std::default_random_engine &generator, int ntaxa, bool hetIgnore, bool hetInclude)
 {
     std::uniform_int_distribution<int> uniform(0, keep.size()-1);
     
@@ -428,13 +395,13 @@ void partD::bootproc(int bootstrap, std::vector<int> &keep, double *bootD1, doub
 	
 	if(hetIgnore==true || (hetIgnore==false && hetInclude==false))
 	{
-		bootrep.populateDtest(bootloci, file, indlist, generator, my_rank, ntaxa);
-		bootpartDtest.calcDs(bootrep, keep.size(), ntaxa, file, my_rank);
+		bootrep.populateDtest(bootloci, file, indlist, generator, ntaxa);
+		bootpartDtest.calcDs(bootrep, keep.size(), ntaxa, file);
 		bootpartDtest.calcStats();
 	}
 	else if(hetInclude==true)
 	{
-		bootrep.populateDtest(bootloci, file, indlist, my_rank, ntaxa);
+		bootrep.populateDtest(bootloci, file, indlist, ntaxa);
 		bootpartDtest.calcPolyDs(bootrep, keep.size());
 		bootpartDtest.polyCalcStats();
 	}
