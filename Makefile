@@ -7,7 +7,7 @@ DstatParent.o : DstatParent.h DstatParent.cpp Stats.h
 	g++ -O3 -std=c++11 -Wall -c DstatParent.cpp
 
 locusfile.o : locusfile.h locusfile.cpp
-	mpic++ -O3 -std=c++11 -Wall -c locusfile.cpp
+	g++ -O3 -std=c++11 -Wall -c locusfile.cpp
 
 fourtax.o : fourtax.h fourtax.cpp
 	g++ -O3 -std=c++11 -Wall -c fourtax.cpp

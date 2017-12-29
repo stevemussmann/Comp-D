@@ -18,8 +18,6 @@
 #include <vector>
 #include <cassert>
 
-#include "mpi.h"
-
 locusfile::locusfile(int vectorsize)
 {
 	species.resize(vectorsize);
@@ -126,7 +124,6 @@ void locusfile::readInput(std::string infile, int locnumber)
 	else //kill program if input file cannot be read
 	{
 		std::cerr << "Unable to open " << infile << std::endl;
-		MPI_Finalize();
 		std::cout.flush();
 		exit(EXIT_FAILURE);
 	}
@@ -166,7 +163,6 @@ void locusfile::readInput(std::string infile, int locnumber, int offset)
 	else
 	{
 		std::cerr << "Unable to open " << infile << std::endl;
-		MPI_Finalize();
 		std::cout.flush();
 		exit(EXIT_FAILURE);
 	}
@@ -232,7 +228,6 @@ void locusfile::readInput(std::string infile, int locnumber, bool phylip)
 	else
 	{
 		std::cerr << "Unable to open " << infile << std::endl;
-		MPI_Finalize();
 		std::cout.flush();
 		exit(EXIT_FAILURE);
 	}
@@ -408,7 +403,7 @@ void locusfile::calcFreq(int locnumber, std::vector<std::vector<std::string>> &t
 	}
 }
 
-std::string locusfile::getMajorAllele(int locus, int taxon, int my_rank)
+std::string locusfile::getMajorAllele(int locus, int taxon)
 {
 	std::string major="";
 	

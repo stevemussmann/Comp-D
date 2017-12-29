@@ -32,7 +32,7 @@ public:
     int GetSize(int i);
     int GetSeqSize(int i);
     void calcFreq(int locnumber, std::vector<std::vector<std::string>> &taxa);
-    std::string getMajorAllele(int locus, int taxon, int my_rank);
+    std::string getMajorAllele(int locus, int taxon);
     std::string GetSeq(int i, int j);
     std::string GetName(int i, int j);
     virtual ~locusfile();

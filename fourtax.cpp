@@ -99,7 +99,7 @@ void fourtax::populateDtest(std::vector<int> &keep, locusfile &file, std::unorde
 		//add taxon major alleles
 		for(int j=0; j<ntaxa; j++)
 		{
-			major[i].at(j) = file.getMajorAllele(keep[i], j, my_rank);
+			major[i].at(j) = file.getMajorAllele(keep[i], j);
 		}
 		
 	}
@@ -112,7 +112,7 @@ void fourtax::populateDtest(std::vector<int> &keep, locusfile &file, std::unorde
 	{
 		for(int j=0; j<ntaxa; j++)
 		{
-			major[i].at(j) = file.getMajorAllele(keep[i], j, my_rank); //find major allele for each taxon at each locus
+			major[i].at(j) = file.getMajorAllele(keep[i], j); //find major allele for each taxon at each locus
 		}
 		
 		for(int j=0; j<file.GetSize(keep[i]); j++)//for each individual
