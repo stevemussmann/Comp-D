@@ -24,8 +24,6 @@
 #include <boost/math/distributions/normal.hpp>
 #include <boost/program_options.hpp>
 
-#include "mpi.h"
-
 #include "locusfile.h"
 #include "fourtax.h"
 #include "Dstat.h"
@@ -53,29 +51,16 @@ void parseComLine(string &infile, string &taxafile, int &locnumber,
         int &bootstrap, string &output, int argc, char **argv, 
         bool &fourtaxflag, bool &partDflag, bool &Dfoilflag, 
         bool &Nremoveflag, bool &gapignoreflag, bool &strflag, bool &phylip, 
-	bool &hetIgnore, bool &hetInclude, int &my_rank);
+	bool &hetIgnore, bool &hetInclude);
 
 
 int main(int argc, char** argv) {
     
-    int my_rank; //initialize processor rank for MPI
-    int p; //initialize number of processors
-    
-    MPI_Init(&argc, &argv); //start MPI
-    
-    MPI_Comm_rank(MPI_COMM_WORLD, &my_rank); //assign values to my_rank
-    
-    MPI_Comm_size(MPI_COMM_WORLD, &p); //assign value to 
-    
-    double start = 0.0;
-    if(my_rank == 0)
-    {
-        start = MPI_Wtime();
-    }
+    //track runtime
+    int start_s = clock();
     
     string infile;
     string taxafile;
-    //int test;
     int locnumber;
     int bootstrap;
     string output;
@@ -92,20 +77,11 @@ int main(int argc, char** argv) {
     //parse the command line
     parseComLine(infile, taxafile, locnumber, bootstrap, output, argc, argv, 
 		 fourtaxflag, partDflag, Dfoilflag, Nremoveflag, gapignoreflag, 
-		 strflag, phylip, hetIgnore, hetInclude, my_rank);
-    
-    //calculate number of bootstraps per processor
-    int mpiboot = bootstrap/p;
-    int remainder = bootstrap%p;
-    if(remainder>0)
-    {
-        mpiboot+=1;
-    }
-    bootstrap = mpiboot*p;
+		 strflag, phylip, hetIgnore, hetInclude);
     
     //start random number generator
     default_random_engine generator;
-    unsigned int seed = (time(0) + my_rank);
+    unsigned int seed = time(0);
     generator.seed(seed);
     
     vector<vector<string>> taxa;
@@ -115,9 +91,7 @@ int main(int argc, char** argv) {
     //read input taxa list file
     readTaxa(taxafile, taxa);
     double readtaxrun = (clock() - readtax) / (double)CLOCKS_PER_SEC;
-    cout << "Time to read taxa file on proc " << my_rank << " = " << readtaxrun << " seconds." << endl;
-    
-    MPI_Barrier(MPI_COMM_WORLD); //make sure all have read taxa file before proceeding
+    cout << "Time to read taxa file = " << readtaxrun << " seconds." << endl;
     
     locusfile newfile(locnumber); //allocate memory to hold contents of input file
     
@@ -140,9 +114,7 @@ int main(int argc, char** argv) {
     
     
     double readallelesrun = (clock() - readalleles) / (double)CLOCKS_PER_SEC;
-    cout << "Time to read alleles file on proc " << my_rank << " = " << readallelesrun << " seconds." << endl;
-    
-    MPI_Barrier(MPI_COMM_WORLD); //make sure all have read alleles file before proceeding
+    cout << "Time to read alleles file  = " << readallelesrun << " seconds." << endl;
     
     //do error correction (i.e., remove Ns from input file)
     if(Nremoveflag==true || gapignoreflag==true)
@@ -181,11 +153,6 @@ int main(int argc, char** argv) {
     
     //get lists of p3 taxa and outgroups
     newfile.calcFreq(locnumber, taxa);
-    
-    
-    //score alleles for loci
-    
-    
     
     //cout << "test type declared." << endl << endl;
 	for(vector<vector<string>>::size_type i=0; i<comb.size(); i++)
@@ -230,59 +197,43 @@ int main(int argc, char** argv) {
 		vector<int> keep = newfile.findInformative(current, locnumber, indlist, ntaxa, hetIgnore);
 		
 		//Dstat Dstattest;
-		if(my_rank == 0)
+		fourtax dtest(keep.size(), ntaxa);
+		if(hetIgnore==true || (hetIgnore==false && hetInclude==false))
 		{
-			fourtax dtest(keep.size(), ntaxa);
-			if(hetIgnore==true || (hetIgnore==false && hetInclude==false))
-			{
-				dtest.populateDtest(keep, current, indlist, generator, ntaxa);
-				test->calcDs(dtest, keep.size(), ntaxa, current);
-				test->calcStats(keep.size());
-			}
-			else if(hetInclude==true)
-			{
-				dtest.populateDtest(keep, current, indlist, ntaxa);
-				test->calcPolyDs(dtest, keep.size());
-				test->polyCalcStats(keep.size());
-			}
-			else
-			{
-				cerr << "This code should not be reachable." << endl;
-				exit(EXIT_FAILURE);
-			}
+			dtest.populateDtest(keep, current, indlist, generator, ntaxa);
+			test->calcDs(dtest, keep.size(), ntaxa, current);
+			test->calcStats(keep.size());
 		}
-		//calculate proportion of discordant loci
-		MPI_Barrier(MPI_COMM_WORLD);
+		else if(hetInclude==true)
+		{
+			dtest.populateDtest(keep, current, indlist, ntaxa);
+			test->calcPolyDs(dtest, keep.size());
+			test->polyCalcStats(keep.size());
+		}
+		else
+		{
+			cerr << "This code should not be reachable." << endl;
+			exit(EXIT_FAILURE);
+		}
 		
 		test->bootstrap(bootstrap, indlist, generator, ntaxa, current, keep, i, comb.size(), indarray, output, hetIgnore, hetInclude);
 		
-		if(my_rank == 0){
-			//put D stats into arrays
-			pop->add(test);
-		}
+		//put D stats into arrays
+		pop->add(test);
 		
 		delete test;
 	}
 
-    MPI_Barrier(MPI_COMM_WORLD);
+	int stop_s = clock();
+	double runtime = (stop_s-start_s)/double(CLOCKS_PER_SEC)*1000;
+	cout << "Time to completion was " << runtime << " seconds." << endl;
     
-    if(my_rank == 0)
-    {
-        double stop = MPI_Wtime();
-        double runtime = stop-start;
-        cout << "Time to completion was " << runtime << " seconds." << endl;
-    }
-    
-    if(my_rank == 0)
-    {
+	//calculate population summary statistics
 	pop->calcStats();
-    }
     
-    delete pop;
-    
-    MPI_Finalize();
-    
-    return 0;
+	delete pop;
+
+	return 0;
 }
 
 void readTaxa(string infile, vector<vector<string>> &taxa)
@@ -338,95 +289,77 @@ void combinations(vector<vector<string> > &array, unsigned int i, vector<string>
 void parseComLine(string &infile, string &taxafile, int &locnumber, int &bootstrap, 
         string &output, int argc, char **argv, bool &fourtaxflag, bool &partDflag, 
         bool &Dfoilflag, bool &Nremoveflag, bool &gapignoreflag, bool &strflag, 
-        bool &phylip, bool &hetIgnore, bool &hetInclude, int &my_rank)
+        bool &phylip, bool &hetIgnore, bool &hetInclude)
 {
-    opt::options_description desc("--- Option Descriptions ---");
-    desc.add_options()
-            ("help,h", "Prints this help message.")
-            ("infile,i", opt::value<string>(&infile)->required(), "Specifies the input alleles file name.")
-            ("taxa,t", opt::value<string>(&taxafile)->required(), "Specifies the input list of taxa.")
-            ("bootstrap,b", opt::value<int>(&bootstrap)->required(), "Specifies the number of bootstrap replicates to be performed.")
-            ("loci,l", opt::value<int>(&locnumber)->required(), "Specifies the number of loci in the input file.")
-            ("outfile,o", opt::value<string>(&output)->default_value("outfile.txt"), "Specifies the name of the output file.")
-            ("fourtax,d", opt::bool_switch(&fourtaxflag), "Turns on the 4-taxon Test.")
-            ("partition,p", opt::bool_switch(&partDflag), "Turns on the Partitioned-D Test.")
-            ("foil,f", opt::bool_switch(&Dfoilflag), "Turns on the Dfoil Test.")
-            ("gap,g", opt::bool_switch(&gapignoreflag), "Turns on the function to ignore gaps in sequences.")
-            ("nremove,n", opt::bool_switch(&Nremoveflag), "Turns on the function to remove Ns from sequences.")
-	    ("hignore,I", opt::bool_switch(&hetIgnore), "Turns on function to ignore any heterozygous loci.")
-	    ("hinclude,H", opt::bool_switch(&hetInclude), "Turns on function to include all heterozygote information in calculations.")
-            ("structure,s", opt::bool_switch(&strflag), "Use this option to input a structure file.")
-            ("phylip,P", opt::bool_switch(&phylip), "Use this option to input a phylip file.")
-    ;
+	opt::options_description desc("--- Option Descriptions ---");
+	desc.add_options()
+		("help,h", "Prints this help message.")
+		("infile,i", opt::value<string>(&infile)->required(), "Specifies the input alleles file name.")
+		("taxa,t", opt::value<string>(&taxafile)->required(), "Specifies the input list of taxa.")
+		("bootstrap,b", opt::value<int>(&bootstrap)->required(), "Specifies the number of bootstrap replicates to be performed.")
+		("loci,l", opt::value<int>(&locnumber)->required(), "Specifies the number of loci in the input file.")
+		("outfile,o", opt::value<string>(&output)->default_value("outfile.txt"), "Specifies the name of the output file.")
+		("fourtax,d", opt::bool_switch(&fourtaxflag), "Turns on the 4-taxon Test.")
+		("partition,p", opt::bool_switch(&partDflag), "Turns on the Partitioned-D Test.")
+		("foil,f", opt::bool_switch(&Dfoilflag), "Turns on the Dfoil Test.")
+		("gap,g", opt::bool_switch(&gapignoreflag), "Turns on the function to ignore gaps in sequences.")
+		("nremove,n", opt::bool_switch(&Nremoveflag), "Turns on the function to remove Ns from sequences.")
+		("hignore,I", opt::bool_switch(&hetIgnore), "Turns on function to ignore any heterozygous loci.")
+		("hinclude,H", opt::bool_switch(&hetInclude), "Turns on function to include all heterozygote information in calculations.")
+		("structure,s", opt::bool_switch(&strflag), "Use this option to input a structure file.")
+		("phylip,P", opt::bool_switch(&phylip), "Use this option to input a phylip file.")
+	;
     
-    opt::variables_map vm;
-    try
-    {
-        opt::store(opt::parse_command_line(argc, argv, desc), vm);
-    
-        if(vm.count("help"))
-        {
-            if(my_rank == 0)
-            {
-                cout << "This program was created for calculating D-statistics given " << endl;
-                cout << "a file of alleles produced by the ddRAD pipeline pyRAD." << endl;
-                cout << desc << endl;
-            }
-            MPI_Finalize();
-            exit(EXIT_FAILURE);
-        }
-        
-        opt::notify(vm); // throws an error if there are any problems
-    }
-    catch(opt::required_option& e) //catch errors resulting from required options
-    {
-        if(my_rank == 0)
-        {
-            cerr <<endl << "ERROR: " << e.what() << endl << endl;
-            cout << desc << endl;
-        }
-        MPI_Finalize();
-        exit(EXIT_FAILURE);
-    }
-    catch(opt::error& e) // catch other command line errors
-    {
-        if(my_rank == 0)
-        {
-            cerr << endl << "ERROR: " << e.what() << endl << endl;
-            cout << desc << endl;
-        }
-        MPI_Finalize();
-        exit(EXIT_FAILURE);
-    }
-    
-    if((fourtaxflag==true && partDflag==true) || (fourtaxflag==true && Dfoilflag==true))
-    {
-        if(my_rank == 0)
-        {
-            cerr << "Cannot run four taxon and five taxon tests simultaneously." << endl;
-        }
-        MPI_Finalize();
-        exit(EXIT_FAILURE);
-    }
-    
-    if(fourtaxflag==false && partDflag==false && Dfoilflag==false)
-    {
-        if(my_rank == 0)
-        {
-            cerr << "Must select at least one test to run." << endl;
-        }
-        MPI_Finalize();
-        exit(EXIT_FAILURE);
-    }
-    
-    if(hetIgnore==true && hetInclude==true)
-    {
-	if(my_rank == 0)
+	opt::variables_map vm;
+	try
 	{
-	    cerr << "Cannot use options to ingore and include heterozygotes simultaneously." << endl;
-	}
-	MPI_Finalize();
-	exit(EXIT_FAILURE);
-    }
+		opt::store(opt::parse_command_line(argc, argv, desc), vm);
     
+		if(vm.count("help"))
+		{
+			cout << "This program was created for calculating D-statistics given " << endl;
+	                cout << "a file of alleles produced by the ddRAD pipeline pyRAD." << endl;
+        	        cout << desc << endl;
+            
+			exit(EXIT_FAILURE);
+	        }
+        
+		opt::notify(vm); // throws an error if there are any problems
+	}
+	catch(opt::required_option& e) //catch errors resulting from required options
+	{
+		cerr <<endl << "ERROR: " << e.what() << endl << endl;
+		cout << desc << endl;
+
+		exit(EXIT_FAILURE);
+	}
+	catch(opt::error& e) // catch other command line errors
+	{
+		cerr << endl << "ERROR: " << e.what() << endl << endl;
+		cout << desc << endl;
+        
+		exit(EXIT_FAILURE);
+	}
+    
+	if((fourtaxflag==true && partDflag==true) || (fourtaxflag==true && Dfoilflag==true))
+	{
+		cerr << "Cannot run four taxon and five taxon tests simultaneously." << endl;
+	
+		exit(EXIT_FAILURE);
+	}
+    
+	if(fourtaxflag==false && partDflag==false && Dfoilflag==false)
+	{
+		cerr << "Must select at least one test to run." << endl;
+		
+		exit(EXIT_FAILURE);
+	}
+    
+	if(hetIgnore==true && hetInclude==true)
+	{
+		cerr << "Cannot use options to ingore and include heterozygotes simultaneously." << endl;
+
+		exit(EXIT_FAILURE);
+	}
+
 }
