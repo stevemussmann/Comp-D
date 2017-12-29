@@ -16,8 +16,6 @@
 #include <fstream>
 #include <iostream>
 
-#include "mpi.h"
-
 #include <boost/math/distributions/chi_squared.hpp>
 #include <boost/math/distributions/normal.hpp>
 
@@ -92,12 +90,12 @@ void Dstat::calcStats()
     }
 }
 
-void Dstat::calcDs(fourtax &dtest, unsigned int length, int ntaxa, locusfile &file, int my_rank)
+void Dstat::calcDs(fourtax &dtest, unsigned int length, int ntaxa, locusfile &file)
 {
 	for(unsigned int i=0; i<length; i++)
 	{
 		//check if all taxa are present
-		dtest.calculatePattern(i, ntaxa, file, my_rank);
+		dtest.calculatePattern(i, ntaxa, file);
 		if(dtest.getPattern(i) == "ABBA")
 		{
 			ABBA++;
@@ -159,24 +157,16 @@ void Dstat::polyCalcChiSqr()
     chisq = this->chisqr(polyABBA, polyBABA);
 }
 
-void Dstat::bootstrap(int mpiboot, int bootstrap, std::unordered_map <std::string,int> &indlist, 
+void Dstat::bootstrap(int bootstrap, std::unordered_map <std::string,int> &indlist, 
 		std::default_random_engine &generator, int ntaxa, locusfile &current, 
-		std::vector<int> &keep, int my_rank, int i, int combs, std::string *indarray, 
+		std::vector<int> &keep, int i, int combs, std::string *indarray, 
 		std::string output, bool hetIgnore, bool hetInclude)
 {
-    double *allBoot;
-    allBoot = new double[bootstrap];
-    //do bootstrapping
-    double *bootD;
-    bootD = new double[mpiboot];
-    bootproc(mpiboot, keep, bootD, current, indlist, generator, ntaxa, hetIgnore, hetInclude, my_rank);
+	double *allBoot;
+	allBoot = new double[bootstrap];
+	//do bootstrapping
+	bootproc(bootstrap, keep, allBoot, current, indlist, generator, ntaxa, hetIgnore, hetInclude);
 
-    MPI_Barrier(MPI_COMM_WORLD); //barrier after completing bootstrapping
-
-    MPI_Gather(bootD, mpiboot, MPI_DOUBLE, allBoot, mpiboot, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-            
-    if(my_rank == 0)
-    {
 	std::cout << "statistics calculated for test " << i+1 << " of " << combs << std::endl;
         //calculate avg and stdev from bootstrapping
         avg = this->average(allBoot, bootstrap);
@@ -213,18 +203,17 @@ void Dstat::bootstrap(int mpiboot, int bootstrap, std::unordered_map <std::strin
         std::cout << "D statistics written" << std::endl;
         for(int i=0; i<4; i++)
         {
-	    std::cout << indarray[i] << std::endl;
+		std::cout << indarray[i] << std::endl;
         }
         std::cout << std::endl;
-    }
-    delete[] indarray;
-    delete[] bootD;
-    delete[] allBoot;
+    
+	delete[] indarray;
+	delete[] allBoot;
 }
 
 void Dstat::bootproc(int bootstrap, std::vector<int> &keep, double *bootD, locusfile &file, 
 		     std::unordered_map <std::string,int> &indlist, std::default_random_engine &generator, 
-		     int ntaxa, bool hetIgnore, bool hetInclude, int my_rank)
+		     int ntaxa, bool hetIgnore, bool hetInclude)
 {
     std::uniform_int_distribution<int> uniform(0, keep.size()-1);
     
@@ -238,10 +227,10 @@ void Dstat::bootproc(int bootstrap, std::vector<int> &keep, double *bootD, locus
             bootloci.push_back(temp);
         }
         fourtax bootrep(keep.size(), ntaxa);
-        bootrep.populateDtest(bootloci, file, indlist, generator, my_rank, ntaxa);
+        bootrep.populateDtest(bootloci, file, indlist, generator, ntaxa);
         
         Dstat bootDtest;
-        bootDtest.calcDs(bootrep, keep.size(), ntaxa, file, my_rank);
+        bootDtest.calcDs(bootrep, keep.size(), ntaxa, file);
         bootDtest.calcStats();
         
         bootD[i] = bootDtest.getD();

@@ -18,11 +18,11 @@ class fourtax {
 public:
     fourtax(int locusnum, int taxnum);
     fourtax(const fourtax& orig);
-    void calculatePattern(int locus, int ntaxa, locusfile &file, int my_rank);
+    void calculatePattern(int locus, int ntaxa, locusfile &file);
     std::string getPattern(int i);
     double getFreq(int locus, int taxon);
-    void populateDtest(std::vector<int> &keep, locusfile &file, std::unordered_map <std::string,int> &indlist, std::default_random_engine &generator, int my_rank, int ntaxa);
-    void populateDtest(std::vector<int> &keep, locusfile &file, std::unordered_map<std::string,int> &indlist, int my_rank, int ntaxa);
+    void populateDtest(std::vector<int> &keep, locusfile &file, std::unordered_map <std::string,int> &indlist, std::default_random_engine &generator, int ntaxa);
+    void populateDtest(std::vector<int> &keep, locusfile &file, std::unordered_map<std::string,int> &indlist, int ntaxa);
     virtual ~fourtax();
 private:
     std::vector<int> locusnum;

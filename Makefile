@@ -13,10 +13,10 @@ fourtax.o : fourtax.h fourtax.cpp
 	g++ -O3 -std=c++11 -Wall -c fourtax.cpp
 
 Dstat.o : Dstat.h Dstat.cpp fourtax.h DstatParent.h Stats.h
-	mpic++ -O3 -std=c++11 -Wall -c Dstat.cpp
+	g++ -O3 -std=c++11 -Wall -c Dstat.cpp
 
 partD.o : partD.h partD.cpp fourtax.h DstatParent.h Stats.h
-	mpic++ -O3 -std=c++11 -Wall -c partD.cpp
+	g++ -O3 -std=c++11 -Wall -c partD.cpp
 
 Dfoil.o : Dfoil.h Dfoil.cpp fourtax.h DstatParent.h Stats.h
 	mpic++ -O3 -std=c++11 -Wall -c Dfoil.cpp

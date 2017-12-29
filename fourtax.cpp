@@ -41,7 +41,7 @@ double fourtax::getFreq(int locus, int taxon)
 	return freq[locus].at(taxon);
 }
 
-void fourtax::calculatePattern(int locus, int ntaxa, locusfile &file, int my_rank)
+void fourtax::calculatePattern(int locus, int ntaxa, locusfile &file)
 {
 	for(int i=ntaxa-1; i>0; i--)
 	{
@@ -58,7 +58,7 @@ void fourtax::calculatePattern(int locus, int ntaxa, locusfile &file, int my_ran
 }
 
 void fourtax::populateDtest(std::vector<int> &keep, locusfile &file, std::unordered_map <std::string,int> &indlist, 
-			    std::default_random_engine &generator, int my_rank, int ntaxa)
+			    std::default_random_engine &generator, int ntaxa)
 {
 	std::binomial_distribution<int> binomial(1,0.5);
     
@@ -105,7 +105,7 @@ void fourtax::populateDtest(std::vector<int> &keep, locusfile &file, std::unorde
 	}
 }
 
-void fourtax::populateDtest(std::vector<int> &keep, locusfile &file, std::unordered_map<std::string,int> &indlist, int my_rank, int ntaxa)
+void fourtax::populateDtest(std::vector<int> &keep, locusfile &file, std::unordered_map<std::string,int> &indlist, int ntaxa)
 {
 	std::unordered_map<std::string,int>::iterator findit;
 	for(unsigned int i=0; i<keep.size(); i++)//for each kept locus
