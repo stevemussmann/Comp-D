@@ -51,7 +51,7 @@ void parseComLine(string &infile, string &taxafile, int &locnumber,
         int &bootstrap, string &output, int argc, char **argv, 
         bool &fourtaxflag, bool &partDflag, bool &Dfoilflag, 
         bool &Nremoveflag, bool &gapignoreflag, bool &strflag, bool &phylip, 
-	bool &hetIgnore, bool &hetInclude);
+	bool &hetIgnore, bool &hetInclude, string &popoutput);
 
 
 int main(int argc, char** argv) {
@@ -64,6 +64,7 @@ int main(int argc, char** argv) {
     int locnumber;
     int bootstrap;
     string output;
+    string popoutput;
     bool fourtaxflag = false; //turns the four taxon test on/off
     bool partDflag = false; //turns the partitioned-D test on/off
     bool Dfoilflag = false; //turns the D-FOIL test on/off
@@ -77,7 +78,7 @@ int main(int argc, char** argv) {
     //parse the command line
     parseComLine(infile, taxafile, locnumber, bootstrap, output, argc, argv, 
 		 fourtaxflag, partDflag, Dfoilflag, Nremoveflag, gapignoreflag, 
-		 strflag, phylip, hetIgnore, hetInclude);
+		 strflag, phylip, hetIgnore, hetInclude, popoutput);
     
     //start random number generator
     default_random_engine generator;
@@ -229,7 +230,8 @@ int main(int argc, char** argv) {
 	cout << "Time to completion was " << runtime << " seconds." << endl;
     
 	//calculate population summary statistics
-	pop->calcStats();
+	pop->calcStats(popoutput);
+	std::cout << "Population Z-scores were written to " << popoutput << std::endl;
     
 	delete pop;
 
@@ -289,7 +291,7 @@ void combinations(vector<vector<string> > &array, unsigned int i, vector<string>
 void parseComLine(string &infile, string &taxafile, int &locnumber, int &bootstrap, 
         string &output, int argc, char **argv, bool &fourtaxflag, bool &partDflag, 
         bool &Dfoilflag, bool &Nremoveflag, bool &gapignoreflag, bool &strflag, 
-        bool &phylip, bool &hetIgnore, bool &hetInclude)
+        bool &phylip, bool &hetIgnore, bool &hetInclude, string &popoutput)
 {
 	opt::options_description desc("--- Option Descriptions ---");
 	desc.add_options()
@@ -298,7 +300,6 @@ void parseComLine(string &infile, string &taxafile, int &locnumber, int &bootstr
 		("taxa,t", opt::value<string>(&taxafile)->required(), "Specifies the input list of taxa.")
 		("bootstrap,b", opt::value<int>(&bootstrap)->required(), "Specifies the number of bootstrap replicates to be performed.")
 		("loci,l", opt::value<int>(&locnumber)->required(), "Specifies the number of loci in the input file.")
-		("outfile,o", opt::value<string>(&output)->default_value("outfile.txt"), "Specifies the name of the output file.")
 		("fourtax,d", opt::bool_switch(&fourtaxflag), "Turns on the 4-taxon Test.")
 		("partition,p", opt::bool_switch(&partDflag), "Turns on the Partitioned-D Test.")
 		("foil,f", opt::bool_switch(&Dfoilflag), "Turns on the Dfoil Test.")
@@ -308,6 +309,8 @@ void parseComLine(string &infile, string &taxafile, int &locnumber, int &bootstr
 		("hinclude,H", opt::bool_switch(&hetInclude), "Turns on function to include all heterozygote information in calculations.")
 		("structure,s", opt::bool_switch(&strflag), "Use this option to input a structure file.")
 		("phylip,P", opt::bool_switch(&phylip), "Use this option to input a phylip file.")
+		("outfile,o", opt::value<string>(&output)->default_value("outfile.txt"), "Specifies the name of the output file.")
+		("popstats,Z", opt::value<string>(&popoutput)->default_value("popZscores.txt"), "Specifies the name of the output file containing population summary Z scores.")
 	;
     
 	opt::variables_map vm;
