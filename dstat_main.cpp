@@ -40,10 +40,6 @@ using namespace std;
 
 namespace opt = boost::program_options;
 
-/*
- * 
- */
-
 void readTaxa(string infile, std::vector<vector<string>> &taxa);
 void combinations(vector<vector<string> > &array, unsigned int i, 
         vector<string> accum, vector<vector<string> > &comb);
@@ -226,7 +222,7 @@ int main(int argc, char** argv) {
 	}
 
 	int stop_s = clock();
-	double runtime = (stop_s-start_s)/double(CLOCKS_PER_SEC)*1000;
+	double runtime = (stop_s-start_s)/double(CLOCKS_PER_SEC);
 	cout << "Time to completion was " << runtime << " seconds." << endl;
     
 	//calculate population summary statistics
