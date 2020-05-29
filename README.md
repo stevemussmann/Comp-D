@@ -3,6 +3,9 @@ A program for comprehensive computation of D-statistics and population summaries
 
 This program calculates variations of Patterson's D-statistic, including the original ABBA-BABA test as well as the partitioned-D and Dfoil tests.
 
+## Citation
+Mussmann, SM, MR Douglas, MR Bangs, and ME Douglas. 2020. COMP-D: a program for comprehensive computation of D-statistics and population summaries of reticulated evolution. *Conservation Genetics Resources* 12(2): 263-267.
+
 ## Compilation
 
 To compile, you must have a recent version of the C++ Boost Libraries and GCC 4.8.1 or newer installed on your computer. Only Boost versions 1.54 and newer have been tested. Download the source code, change directories into the Comp-D folder, and compile by issuing the command:
